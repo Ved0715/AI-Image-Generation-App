@@ -1,11 +1,9 @@
 import React , {useState , useEffect} from 'react'
-import { Loader, FormField , Card } from '../components'
+import { Header , Loader, FormField , Card } from '../components'
 
 
-import { Header } from '../components';
 
-
-const ReactCard =({data , title}) => {
+const RenderCard =({data , title}) => {
     if(data?.length >0) {
         return data.map((post) => <Card key={post._id} {...post} />)
     }
@@ -16,12 +14,76 @@ const Home = () => {
     const [loading , setLoading] = useState(false);
     const [allPosts , setAllPosts] = useState(null);
     const [searchText , setSearchText] = useState('');
+    const [searchTimeout ,setSearchTimeout] = useState(null);
+    const [searchResults , setSearchResults] = useState(null);
+
+
+      useEffect(() => {
+        const fetchPosts = async () => {
+          setLoading(true);
+          try {
+            const res = await fetch('http://localhost:8080/api/v1/post/get-all-posts',{
+              method:'GET',
+              headers:{
+                "Content-Type": 'application/json',
+              },
+            });
+            // [
+            //     {
+            //       _id: new ObjectId('679af881cc5114e5bd02ce5f'),
+            //       name: 'Vedant Narwade',
+            //       prompt: 'A BBQ that is alive, in the style of a Pixar animated movie',
+            //       image: 'http://res.cloudinary.com/ddllbpmbp/image/upload/v1738209408/qc3qhhaaa2rl9dxtma0g.jpg',
+            //       __v: 0
+            //     }
+            //   ]
+            if (res.ok) {
+              const result = await res.json();
+              if(!result){
+                throw new Error('Result not defined');
+              }
+              setAllPosts(result.posts.reverse())
+            }
+    
+          } catch (error) {
+            alert(error)
+          } finally {
+            setLoading(false)
+          }
+        }
+        fetchPosts();
+      },[]);
+
+
+      const handleSearchChange =(e) => {
+        clearTimeout(searchTimeout);
+
+        setSearchText(e.target.value);
+
+        setSearchTimeout(
+          setTimeout(() => {
+            const searchResults = allPosts.filter((item) => item.name.toLowerCase().includes(searchText.toLowerCase()) || item.prompt.toLowerCase().includes(searchText.toLowerCase()));
+            setSearchResults(searchResults);
+          }, 500)
+        );
+      }
+
+
+
+
 
   return (
     <section className='max-w-7xl mx-auto'>
         <Header />
-        <div className="mt-16">
-            <FormField />
+        <div className="mt-10">
+            <FormField 
+            labelName="Search Post"
+            name="text"
+            type='text'
+            placeholder="Search Post"
+            value={searchText}
+            handleChange={handleSearchChange}
+            />
         </div>
         <div className="mt-10">
             {loading ? (
@@ -37,9 +99,9 @@ const Home = () => {
                     )}
                     <div className="grid lg:grid-cols-4 sm:grid-col-3 xs:grid-cols-2 grid-cols-1 gap-3">
                         {searchText ? (
-                            <ReactCard data={[]} title='No results found' />
+                            <RenderCard data={searchResults} title='No results found' />
                         ) : (
-                            <ReactCard data={[]} title='No Post Found' />
+                            <RenderCard data={allPosts} title='No Post Found' />
                         )}
                     </div>
                 </>

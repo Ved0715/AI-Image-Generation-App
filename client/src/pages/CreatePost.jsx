@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { preview } from "../assets";
@@ -8,15 +8,15 @@ import { FormField, Loader } from "../components";
 
 
 
-const handleChange = (e) => {
-    const { name, value } = e.target
-    setForm((prev) => {
-        return {
-            ...prev,
-            name: value
-        }
-    })
-}
+// const handleChange = (e) => {
+//     const { name, value } = e.target
+//     setForm((prev) => {
+//         return {
+//             ...prev,
+//             name: value
+//         }
+//     })
+// }
 
 
 const CreatePost = () => {
@@ -36,35 +36,76 @@ const CreatePost = () => {
     }));
   };
 
-  const generateImage = async() => {
-    setGeneratingImg(true);
+  const api = import.meta.env.HGIM_API;
 
-    const res = await fetch("http://localhost:8080/api/v1/dalle/generate-images", {
-        method: "POST", 
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: form.prompt,
-        }),
-      })
-      .then((res) => {
-        if (!res.ok){
-            throw new Error('Failed to generate image');
-        }
-        return res.json();
-      })
-      .then(data => {
-        console.log(data);
-        updateImage(data.image);
-        setGeneratingImg(false)
-      })
-      .catch((err)=> console.log(err));
-
+const generateImage = () => {
+  setGeneratingImg(true);
+  if (!form.prompt){
+    alert("Please Enter Prompt")
+    return
   }
+  fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${api}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      "inputs": form.prompt,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('Unauthorized: Invalid or expired token');
+        }
+        throw new Error('Failed to generate image');
+      }
+      return res.blob();
+    })
+    .then((blob) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        updateImage(base64data);
+      };
+      reader.readAsDataURL(blob);
+    })
+    .catch((err) => {
+      console.error('Error generating image:', err);
+    })
+    .finally(() => {
+      setGeneratingImg(false);
+    });
+  };
 
-  const handleSubmit = () => {
 
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if(form.prompt && form.image && form.name){
+      setLoading(true)
+      try {
+        const res = await fetch('http://localhost:8080/api/v1/post/create-post',{
+          method:'POST',
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(form)
+      })
+
+      await res.json();
+      navigate('/');
+      } catch (error) {
+        console.log(error)
+        alert(error)
+      }
+      finally{
+        setLoading(false);
+      }
+    } else {
+      alert('Please Enter fill the fields')
+    }
   }
 
 
@@ -78,6 +119,9 @@ const CreatePost = () => {
   }
 
 
+
+
+
   return (
     <section className="max-w-7xl mx-auto">
       <div>
@@ -85,7 +129,7 @@ const CreatePost = () => {
           Create
         </h1>
         <p className="mt-2 text-[#666e75] text-[16px] max-w-[500px]">
-          Create imaginative and visually stunnging images gemerated through DALL-E AI share them with community.
+          Create imaginative and visually stunnging images gemerated through Flux.1 AI share them with community.
         </p>
       </div>
       <form className="mt-16 max-w-3xl" onSubmit={handleSubmit} >
